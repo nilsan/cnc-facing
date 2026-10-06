@@ -48,6 +48,9 @@ import { validate, type JobRequest, type Refusal } from "./validate.ts";
 
 export const VERSION: string = pkg.version;
 
+/** The repository's web page, from package.json. */
+export const SOURCE: string = pkg.repository.url.replace(/^git\+/, "").replace(/\.git$/, "");
+
 /**
  * The thickness `;@MKR|STOCK` declares, mm. Fixed, not asked for.
  *

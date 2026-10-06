@@ -8,7 +8,7 @@
  */
 
 import { networkInterfaces } from "node:os";
-import { buildJob, VERSION } from "./gcode.ts";
+import { buildJob, SOURCE, VERSION } from "./gcode.ts";
 import { DEFAULT_PATTERN, PATTERNS } from "./facing.ts";
 import { PATTERN_LABELS } from "./summary.ts";
 import { DEFAULT_ALLOW, isPrivate, matches, parseAllow, reachableOn } from "./net.ts";
@@ -261,6 +261,7 @@ const server = Bun.serve({
     /** The materials table, so the form does not restate what materials.ts knows. */
     "/api/materials": guard(() => json({
       version: VERSION,
+      source: SOURCE,
       defaultStepover: DEFAULT_STEPOVER,
       envelope: { x: ENVELOPE_X, y: ENVELOPE_Y },
       defaultPattern: DEFAULT_PATTERN,

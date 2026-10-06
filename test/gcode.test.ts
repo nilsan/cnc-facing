@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { buildJob, EOL, filenameFor, VERSION } from "../src/gcode.ts";
+import { buildJob, EOL, filenameFor, SOURCE, VERSION } from "../src/gcode.ts";
 import { PATTERNS } from "../src/facing.ts";
 import { MATERIAL_IDS } from "../src/materials.ts";
 
@@ -161,5 +161,11 @@ describe("the declared stock", () => {
   test("and no longer depends on anything the form sends", () => {
     const withExtra = buildJob({ ...REQ, stockHeight: 3 } as never, { thumbnail: false });
     expect(withExtra.ok && withExtra.lines.find((l) => l.startsWith(";@MKR|STOCK"))).toContain("height=12");
+  });
+});
+
+describe("the source link", () => {
+  test("is package.json's repository as a web page", () => {
+    expect(SOURCE).toBe("https://github.com/nilsan/cnc-facing");
   });
 });
