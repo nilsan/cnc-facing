@@ -21,15 +21,13 @@
  * plastics only, with no aluminium or brass column at all. The 12mm one is the
  * Metal series and Makera does publish metal figures for it.
  *
- * A 6mm single flute was carried here briefly (2026-09-21) and then dropped:
- * one bit, one collet, one set of numbers is worth more than a marginal gain.
- * If it ever comes back, the facts were: Makera sell it with a DLC coating, and
- * publish a Tool Parameters table for it on the PRODUCT page rather than on the
- * wiki speeds-and-feeds page (whose tables contain no tool 4mm or wider). Those
- * figures are IDENTICAL to the 3.175 row material for material, so the only
- * gains were stepover and stiffness. `tools` stays an array so re-adding a bit
- * is a table entry rather than a refactor.
+ * Every other Makera flat end comes from makera.ts, with the checker's figures
+ * for it (catalogue.ts), so a material offers only the bits Makera has figures
+ * for: the non-metal series has no aluminium or brass column.
  */
+
+import { CAT_MATERIAL_LABELS, matchBit, type CatMaterial } from "./catalogue.ts";
+import { LIBRARY, nominalSize } from "./makera.ts";
 
 export interface Tool {
   /** Makera's own naming, diameter*flutelength; goes verbatim into `;@MKR|TOOL|name=`. */
@@ -46,6 +44,8 @@ export interface Tool {
 export interface ToolProfile {
   /** Short key used in the form and the filename. */
   readonly id: ToolId;
+  /** What the form lists it as. */
+  readonly label: string;
   readonly tool: Tool;
   readonly rpm: number;
   /** mm/min, lateral. Must stay under MAX_FEEDRATE. */
@@ -113,7 +113,7 @@ export const DEFAULT_CHAMFER = 0.2;
 /** Largest chamfer offered, mm. Past this it is a feature, not an edge break. */
 export const MAX_CHAMFER = 1.0;
 
-export type ToolId = "3.175";
+export type ToolId = string;
 export type MaterialId = "mdf" | "aluminium" | "brass";
 
 export interface Material {
@@ -156,6 +156,9 @@ const FLAT_3175: Tool = {
   fluteLength: 12,
 };
 
+/** The library's entry for FLAT_3175, which the hand-checked rows below stand in for. */
+const FLAT_3175_LIBRARY_ID = "spiral-o-metal-3.175x12mm";
+const FLAT_3175_LABEL = "Spiral O Metal 3.175*12mm";
 
 /**
  * 0.45 of tool diameter is the reference script's figure, picked conservatively
@@ -170,6 +173,54 @@ const FLAT_3175: Tool = {
  */
 export const DEFAULT_STEPOVER = 0.45;
 
+/** The 3.175 rows' absolute steps, mm, roughing and finishing. */
+const ROUGH_STEP = FLAT_3175.diameter * DEFAULT_STEPOVER;
+const FINISH_STEP = FLAT_3175.diameter * 0.22;
+
+/**
+ * The library's other flat ends with figures for this column, by collet then
+ * size. The figures are the checker's row for the bit, so a file from here is
+ * checked against its own numbers. Stepover is scaled so a wider bit keeps the
+ * 3.175's absolute step, per the note above; a narrower one keeps the 3.175's
+ * fractions.
+ */
+function libraryTools(column: CatMaterial): ToolProfile[] {
+  const bits = LIBRARY.filter((b) => b.kind === "flat" && b.id !== FLAT_3175_LIBRARY_ID);
+  return bits.flatMap((b): ToolProfile[] => {
+    const { diameter: d, flute: l } = nominalSize(b);
+    const name = `${d}*${l}mm Flat End${b.metal ? "(Metal)" : ""}`;
+    const m = matchBit({ name });
+    const p = m.ok ? m.bit.rows[column] : null;
+    if (!m.ok || !p) return [];
+    const stepover = Math.min(DEFAULT_STEPOVER, Number((ROUGH_STEP / b.diameter).toFixed(3)));
+    return [{
+      id: `${d}x${l}mm${b.metal ? "-metal" : ""}`,
+      label: b.name,
+      tool: {
+        name,
+        type: "Flat End",
+        diameter: b.diameter,
+        handleDiameter: b.shank,
+        fluteLength: b.flute,
+      },
+      rpm: p.rpm,
+      feed: p.feed,
+      plunge: p.plunge,
+      maxDepthPerPass: p.doc,
+      stepover,
+      finishStepover: Math.min(0.22, Number((FINISH_STEP / b.diameter).toFixed(3))),
+      source: m.bit.id === b.id
+        ? `Makera's Fusion 360 library, \`${b.name}\`, ${CAT_MATERIAL_LABELS[column]} preset`
+        : `Makera's speeds and feeds, \`${m.bit.name}\`, ${CAT_MATERIAL_LABELS[column]} column`,
+      derived: false,
+      note: stepover < DEFAULT_STEPOVER
+        ? `Makera's preset. Stepover ${stepover} keeps the 3.175 bit's ${ROUGH_STEP.toFixed(2)}mm step.`
+        : "Makera's preset.",
+    }];
+  }).sort((a, b) => a.tool.handleDiameter - b.tool.handleDiameter ||
+    a.tool.diameter - b.tool.diameter || a.tool.fluteLength - b.tool.fluteLength || a.id.localeCompare(b.id));
+}
+
 export const MATERIALS: Record<MaterialId, Material> = {
   mdf: {
     id: "mdf",
@@ -181,6 +232,7 @@ export const MATERIALS: Record<MaterialId, Material> = {
     tools: [
       {
         id: "3.175",
+        label: FLAT_3175_LABEL,
         tool: FLAT_3175,
         rpm: 10000,
         feed: 1000,
@@ -194,6 +246,7 @@ export const MATERIALS: Record<MaterialId, Material> = {
         derived: false,
         note: "Makera publishes no MDF column for milling. Hardwood is the conservative read of the two wood columns (softwood allows 2.0mm/pass) and is what every faced board on this machine has been cut with.",
       },
+      ...libraryTools("hardwood"),
     ],
   },
 
@@ -207,6 +260,7 @@ export const MATERIALS: Record<MaterialId, Material> = {
     tools: [
       {
         id: "3.175",
+        label: FLAT_3175_LABEL,
         tool: FLAT_3175,
         rpm: 12000,
         feed: 500,
@@ -218,6 +272,7 @@ export const MATERIALS: Record<MaterialId, Material> = {
         derived: false,
         note: "Vendor figures. Note the surface speed is only 120 m/min, which is low for carbide in aluminium and is where built-up edge comes from — so if a test coupon comes out cloudy grey rather than bright, suspect that before the feeds, and go shallower rather than faster.",
       },
+      ...libraryTools("aluminum"),
     ],
   },
 
@@ -231,6 +286,7 @@ export const MATERIALS: Record<MaterialId, Material> = {
     tools: [
       {
         id: "3.175",
+        label: FLAT_3175_LABEL,
         tool: FLAT_3175,
         rpm: 12000,
         feed: 300,
@@ -242,6 +298,7 @@ export const MATERIALS: Record<MaterialId, Material> = {
         derived: false,
         note: "The slowest combination here: 0.1mm per pass at 300mm/min. Check the time estimate before committing the machine; a shallower total depth is usually the fix.",
       },
+      ...libraryTools("brass"),
     ],
   },
 };
@@ -285,5 +342,5 @@ export function isMaterialId(v: unknown): v is MaterialId {
 }
 
 export function isToolId(v: unknown): v is ToolId {
-  return v === "3.175";
+  return MATERIAL_IDS.some((m) => MATERIALS[m].tools.some((t) => t.id === v));
 }

@@ -1,9 +1,6 @@
 /**
- * The materials table and the bit it names.
- *
- * A 6mm single flute lived here briefly and was dropped in favour of one bit,
- * one collet, one set of numbers. `tools` is still an array, so the shape these
- * tests pin is the one a second bit would slot into.
+ * The materials table and the bits it offers: the hand-checked 3.175x12mm
+ * default, then Makera's other flat ends from the Fusion library.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -21,12 +18,40 @@ function build(over: Partial<JobRequest> = {}) {
 }
 
 describe("the table itself", () => {
-  test("one bit, the 3.175x12mm Metal-series flat end, for every material", () => {
+  test("the 3.175x12mm Metal-series flat end is every material's default", () => {
     for (const id of MATERIAL_IDS) {
-      expect(MATERIALS[id].tools.map((t) => t.id)).toEqual(["3.175"]);
+      expect(MATERIALS[id].tools[0]!.id).toBe("3.175");
       const r = resolve(id)!;
       expect(r.tool.diameter).toBe(3.175);
       expect(r.tool.fluteLength).toBe(12);
+    }
+  });
+
+  test("every material offers Makera's flat ends in all three collets", () => {
+    for (const id of MATERIAL_IDS) {
+      const tools = MATERIALS[id].tools;
+      expect(new Set(tools.map((t) => t.id)).size).toBe(tools.length);
+      expect([...new Set(tools.map((t) => t.tool.handleDiameter))].sort()).toEqual([3.175, 4, 6]);
+      expect(tools.every((t) => t.tool.type === "Flat End")).toBe(true);
+    }
+  });
+
+  test("the metals offer only the Metal series", () => {
+    // The non-metal series has no aluminium or brass presets at all.
+    for (const id of ["aluminium", "brass"] as const) {
+      expect(MATERIALS[id].tools.slice(1).every((t) => t.tool.name.endsWith("(Metal)"))).toBe(true);
+    }
+    expect(MATERIALS.mdf.tools.some((t) => t.id === "3.175x42mm")).toBe(true);
+  });
+
+  test("a wider bit keeps the 3.175's absolute step", () => {
+    // Ridges from spindle tram scale with the absolute step, not the fraction.
+    const base = resolve("mdf")!;
+    for (const id of MATERIAL_IDS) {
+      for (const t of MATERIALS[id].tools) {
+        expect(t.tool.diameter * t.stepover).toBeLessThanOrEqual(base.tool.diameter * base.stepover + 0.01);
+        expect(t.tool.diameter * t.finishStepover).toBeLessThanOrEqual(base.tool.diameter * base.finishStepover + 0.01);
+      }
     }
   });
 
@@ -46,7 +71,7 @@ describe("the table itself", () => {
     for (const id of MATERIAL_IDS) {
       for (const t of MATERIALS[id].tools) {
         expect(t.derived).toBe(false);
-        expect(t.source).toContain("speeds and feeds");
+        expect(t.source).toMatch(/speeds and feeds|Fusion 360 library/);
       }
     }
   });
@@ -69,12 +94,13 @@ describe("the table itself", () => {
     }
   });
 
-  test("the finishing allowance fits inside one pass of the tool", () => {
+  test("the finishing allowance fits inside one pass of every tool", () => {
     // Otherwise finish mode would ask for a cut deeper than the bit is rated
     // for, which validate.ts refuses but should never have to.
     for (const id of MATERIAL_IDS) {
-      const t = resolve(id)!;
-      expect(t.finishAllowance).toBeLessThanOrEqual(t.maxDepthPerPass);
+      for (const t of MATERIALS[id].tools) {
+        expect(t.maxDepthPerPass).toBeGreaterThanOrEqual(MATERIALS[id].finishAllowance);
+      }
     }
   });
 });
@@ -85,10 +111,15 @@ describe("choosing a bit", () => {
     // collet, and nothing downstream could notice.
     const r = validate({ ...REQ, tool: "6" as never });
     expect(r[0]!.field).toBe("tool");
-    expect(r[0]!.message).toContain("6mm");
+    expect(r[0]!.message).toContain('"6"');
   });
 
-  test("omitting the tool gives the material's only profile", () => {
+  test("a bit with no figures for the material is refused", () => {
+    const r = validate({ ...REQ, material: "aluminium", depth: 0.1, tool: "3.175x42mm" });
+    expect(r[0]!.field).toBe("tool");
+  });
+
+  test("omitting the tool gives the material's default profile", () => {
     expect(build().summary.toolId).toBe("3.175");
     expect(build({ tool: "3.175" }).summary.toolId).toBe("3.175");
   });
@@ -97,6 +128,15 @@ describe("choosing a bit", () => {
     expect(build().lines.some((l) =>
       l.startsWith(";@MKR|TOOL|") && l.includes("name=3.175*12mm Flat End - FACING") &&
       l.includes("diameter=3.175") && l.includes("flutelength=12"))).toBe(true);
+  });
+
+  test("a library bit brings its own geometry and Makera's preset", () => {
+    const r = build({ material: "aluminium", depth: 0.2, tool: "6x17mm-metal", stepover: 0.238 });
+    expect(r.summary.toolId).toBe("6x17mm-metal");
+    expect(r.lines.some((l) =>
+      l.startsWith(";@MKR|TOOL|") && l.includes("name=6*17mm Flat End(Metal) - FACING") &&
+      l.includes("handlediameter=6") && l.includes("diameter=6") && l.includes("flutelength=17"))).toBe(true);
+    expect(r.lines).toContain("S12000 M3");
   });
 
   test("and the spindle speed follows the material", () => {
@@ -115,6 +155,11 @@ describe("the filename", () => {
       .toBe("facing-brass-80x60-0.1mm-20260921.nc");
     expect(filenameFor({ ...x, mode: "general" }, AT)).toBe("facing-mdf-80x60-0.3mm-20260921.nc");
     expect(filenameFor(REQ, AT)).toBe("facing-mdf-80x60-0.3mm-serpentine-y-20260921.nc");
+  });
+
+  test("names a non-default bit by its id", () => {
+    expect(filenameFor({ ...REQ, tool: "4x22mm-metal" }, AT))
+      .toBe("facing-mdf-4x22mm-metal-80x60-0.3mm-serpentine-y-20260921.nc");
   });
 
   test("names finish mode, so the two coupons of a comparison cannot collide", () => {

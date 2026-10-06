@@ -26,9 +26,11 @@ bun run typecheck
 - **Header and preview**: Makera's `;@MKR|` header, a toolpath thumbnail, and an
   MDI corner walk (the "reach" check) so the laser can be used to confirm the
   stock position before cutting.
-- **Bits**: one bit, the 3.175 × 12mm single flute (Metal series), with
-  Makera's published speeds and feeds. Chamfer and fly-cutter options exist;
-  the checker also knows Makera's table for other bits.
+- **Bits**: pick a collet (1/8" by default), then any Makera flat end that fits
+  it and has figures for the material. The 3.175 × 12mm single flute (Metal
+  series) is the default. Wider bits get a smaller stepover fraction, so the
+  step stays about 1.4mm. Chamfer and fly-cutter options exist; the checker
+  also knows Makera's table for other bits.
 - **Check a file** (`/#check`): reports Fail / Silent / Warning / Note findings
   for an uploaded `.nc` and draws its toolpath. Nothing is stored. It checks
   that a file is valid Z1 code *within the parameters this project has tested*,
@@ -44,6 +46,16 @@ bun run typecheck
 
 The machine knowledge lives in `src/facing.ts`, `src/mkr.ts`, `src/materials.ts`
 and `src/check.ts`, with each rule commenting where it was learned.
+
+The full Makera bit list, with Makera's presets per material, is
+`src/makera-bits.json`, read through `src/makera.ts`. It is generated from the
+Fusion 360 tool libraries in Makera's
+[CarveraProfiles](https://github.com/MakeraInc/CarveraProfiles) repository, and
+records the commit it came from:
+
+```sh
+bun scripts/makera-library.ts [git ref, default main]
+```
 
 ## Docker
 

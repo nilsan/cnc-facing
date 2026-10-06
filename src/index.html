@@ -119,10 +119,6 @@
   table.mdi tr:first-child td { border-top: 0; }
   table.mdi td.why { font-size: .78rem; color: var(--dim); }
   table.mdi tr.crit code { border-color: var(--accent); color: var(--accent); }
-  .onlytool {
-    font: .9rem var(--mono); padding: .45rem .6rem; margin-bottom: .85rem;
-    border: 1px solid var(--line); border-radius: 6px; background: var(--bg);
-  }
   code.copy {
     display: inline-block; white-space: nowrap; cursor: copy;
     font: .82rem/1.3 var(--mono); padding: .25rem .45rem;
@@ -198,9 +194,8 @@
       <h2>The job</h2>
       <span style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Material</span>
       <div class="seg" id="mats"></div>
-      <span id="toollabel" style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Bit in the collet</span>
-      <div class="seg" id="tools"></div>
-      <div id="onlytool" class="onlytool" hidden></div>
+      <label><span>Collet</span><select id="collet"></select></label>
+      <label><span>Bit in the collet</span><select name="tool" id="tools"></select></label>
       <p class="cite" id="toolnote" style="margin-top:-.4rem"></p>
       <div class="row">
         <label><span>Size X (mm)</span><input type="number" name="width" value="80" min="0" step="0.1" required></label>
@@ -230,7 +225,7 @@
         <summary>Advanced</summary>
         <div>
           <label><span>Stepover (fraction of tool diameter)</span>
-            <input type="number" name="stepover" value="0.45" min="0.05" max="1" step="0.05" required></label>
+            <input type="number" name="stepover" value="0.45" min="0.05" max="1" step="any" required></label>
           <p class="cite">0.45 is what every job here has used.</p>
         </div>
       </details>
@@ -355,20 +350,25 @@ $("patterns").innerHTML = meta.patterns.map((p) =>
   `${p.id === meta.defaultPattern ? " checked" : ""}><span>${SHORT[p.id] ?? p.label}</span></label>`
 ).join("");
 
-/** The bit list depends on the material, so it is rebuilt whenever that changes. */
-function renderTools(keep) {
+const COLLET = (s) => (s === 3.175 ? '1/8" (3.175 mm)' : `${s} mm`);
+
+/** Collets with a bit for this material. Keeps the chosen one, else the default bit's (1/8"). */
+function renderCollets() {
   const tools = MATS[form.material.value].tools;
+  const shanks = [...new Set(tools.map((t) => t.shank))].sort((a, b) => a - b);
+  const was = Number($("collet").value);
+  const pick = shanks.includes(was) ? was : tools[0].shank;
+  $("collet").innerHTML = shanks.map((s) =>
+    `<option value="${s}"${s === pick ? " selected" : ""}>${COLLET(s)}</option>`).join("");
+}
+
+/** The bits that fit the collet, rebuilt whenever the material or collet changes. */
+function renderTools(keep) {
+  const shank = Number($("collet").value);
+  const tools = MATS[form.material.value].tools.filter((t) => t.shank === shank);
   const chosen = tools.some((t) => t.id === keep) ? keep : tools[0].id;
   $("tools").innerHTML = tools.map((t) =>
-    `<label><input type="radio" name="tool" value="${t.id}"${t.id === chosen ? " checked" : ""}>` +
-    `<span>${t.label}${t.derived ? "<sup>*</sup>" : ""}</span></label>`).join("");
-  // With one bit there is nothing to choose, so the radio stays in the DOM to
-  // carry its value and the row collapses to a plain statement of what to fit.
-  const only = tools.length === 1;
-  $("tools").hidden = only;
-  $("toollabel").textContent = only ? "Bit to fit" : "Bit in the collet";
-  $("onlytool").hidden = !only;
-  $("onlytool").textContent = only ? tools[0].tool : "";
+    `<option value="${t.id}"${t.id === chosen ? " selected" : ""}>${t.label}${t.derived ? " *" : ""}</option>`).join("");
 }
 
 const MODE_NOTE = {
@@ -432,6 +432,7 @@ function syncStepover() {
     : "Makera's published figures.";
 }
 
+renderCollets();
 renderTools();
 form.depth.value = MATS[form.material.value].defaultDepth;
 syncStepover();
@@ -542,11 +543,12 @@ async function plan() {
 
 form.addEventListener("input", (e) => {
   if (e.target.name === "material") {
-    renderTools(form.tool?.value); syncStepover(); syncOverhang(); syncMode();
+    renderCollets(); renderTools(form.tool.value); syncStepover(); syncOverhang(); syncMode();
     // One facing pass at Makera's depth of cut for the new material.
     form.depth.value = MATS[form.material.value].defaultDepth;
   }
   else if (e.target.name === "tool") { syncStepover(); syncOverhang(); }
+  else if (e.target.id === "collet") { renderTools(); syncStepover(); syncOverhang(); }
   else if (e.target.name === "mode" || e.target.name === "pattern") syncMode();
   else if (e.target.name === "overhang" || e.target.name === "chamferOn") syncOverhang();
   plan();

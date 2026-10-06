@@ -236,7 +236,7 @@ export function writeGcode(lines: string[]): string {
  * Anything that changes the cut but not those fields gets named too, because two
  * jobs sharing a filename is how the wrong one ends up on the machine:
  *
- *   a non-default bit   `facing-aluminium-6mm-90x70-0.4mm-...`
+ *   a non-default bit   `facing-aluminium-6x17mm-metal-90x70-0.4mm-...`
  *   finish mode         `facing-brass-40x30-0.1mm-finish-...`
  *   a non-default pattern `facing-aluminium-40x30-0.2mm-spiral-...`
  *   overhang on         `facing-aluminium-45.2x45.2-0.2mm-overhang-...`
@@ -255,7 +255,7 @@ export function filenameFor(req: JobRequest, now = new Date()): string {
   const d = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
   const recipe = resolve(req.material, req.tool);
   const isDefaultBit = !recipe || MATERIALS[req.material]?.tools[0]?.id === recipe.id;
-  const bit = isDefaultBit ? "" : `-${recipe.tool.diameter}mm`;
+  const bit = isDefaultBit ? "" : `-${recipe.id}`;
   const mode = req.mode === "finish" ? "-finish" : "";
   const effective = req.mode === "finish" ? "serpentine-x" : req.pattern ?? DEFAULT_PATTERN;
   const pattern = effective !== "serpentine-x" ? `-${effective}` : "";

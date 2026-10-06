@@ -84,10 +84,9 @@ function parseRequest(body: unknown): JobRequest {
   const num = (v: unknown) => (v === "" || v === null || v === undefined ? Number.NaN : Number(v));
   const material = isMaterialId(b.material) ? b.material : ("" as JobRequest["material"]);
   const tool = isToolId(b.tool) ? b.tool : undefined;
-  // An omitted stepover means "whatever this bit wants", not a global constant.
-  // With one bit those coincide; with two they would not, since a wider tool
-  // needs a smaller FRACTION to keep the absolute step -- and so the ridge left
-  // by any spindle tram -- where it is.
+  // An omitted stepover means "whatever this bit wants", not a global constant:
+  // a wider tool needs a smaller FRACTION to keep the absolute step -- and so
+  // the ridge left by any spindle tram -- where it is.
   const fallback = resolve(material, tool)?.stepover ?? DEFAULT_STEPOVER;
   return {
     width: num(b.width),
@@ -272,8 +271,8 @@ const server = Bun.serve({
         defaultDepth: MATERIALS[id].defaultDepth,
         tools: MATERIALS[id].tools.map((t) => ({
           id: t.id,
-          // "3.175mm" -- what the form shows, and what goes in the collet.
-          label: `${t.tool.diameter}mm`,
+          label: t.label,
+          shank: t.tool.handleDiameter,
           tool: t.tool.name,
           rpm: t.rpm,
           feed: t.feed,

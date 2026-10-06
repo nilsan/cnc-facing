@@ -181,7 +181,7 @@ export function summarise(path: FacingPath, stock: StockDeclaration, chamfer: Ch
     source: m.source,
     materialNote: m.note,
     stepoverMm: path.step,
-    stepoverPct: spec.stepover * 100,
+    stepoverPct: Number((spec.stepover * 100).toFixed(1)),
     maxDepthPerPass: m.maxDepthPerPass,
     levels: path.levels.length,
     passesPerLevel: path.passesPerLevel,

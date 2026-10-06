@@ -38,8 +38,17 @@ describe("identifying a bit from its header name", () => {
     expect(id("3.175mm Flat End", { fluteLength: 25 })).toBe("flat-3.175-25");
   });
 
+  test("the library's flat ends, by size and series", () => {
+    expect(id("6*17mm Flat End(Metal)")).toBe("spiral-o-metal-6x17mm-dlc");
+    expect(id("6*30mm Flat End(Metal)")).toBe("spiral-o-metal-6x30mm-dlc");
+    expect(id("4*22mm Flat End(Metal)")).toBe("spiral-o-metal-4x22m");
+    expect(id("4*22mm Flat End")).toBe("spiral-o-4x22m");
+    expect(id("1*3mm Flat End")).toBe("spiral-o-1x3mm");
+    expect(id("3.175*17mm Flat End")).toBe("spiral-o-3.175x17mm");
+  });
+
   test("a bit Makera does not sell is not identified", () => {
-    expect(id("6*17mm Flat End(Metal)")).toMatch(/^none/);
+    expect(id("7*17mm Flat End(Metal)")).toMatch(/^none/);
     expect(id("Mystery cutter")).toMatch(/^none/);
   });
 

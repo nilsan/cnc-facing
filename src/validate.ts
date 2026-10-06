@@ -94,7 +94,7 @@ export function validate(req: JobRequest): Refusal[] {
   if (req.tool !== undefined && material.id !== req.tool) {
     // Silently falling back to the default bit would run a job at the wrong
     // feeds for the bit actually in the collet.
-    return [{ field: "tool", message: `No ${req.tool}mm profile for ${material.label}.` }];
+    return [{ field: "tool", message: `No ${material.label} figures for bit "${req.tool}".` }];
   }
   const tool = material.tool;
 

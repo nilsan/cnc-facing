@@ -16,7 +16,12 @@
  *
  * materials.ts's facing rows cite the same 3.175*12mm row; a test holds the two
  * to the same numbers, so they cannot drift apart.
+ *
+ * The flat ends this table lacks come from makera.ts with their Fusion presets,
+ * so every bit the facing form offers is one the checker knows.
  */
+
+import { LIBRARY, nominalSize } from "./makera.ts";
 
 export type CatMaterial =
   | "aluminum" | "brass" | "carbonFiber" | "copper" | "hardwood" | "pcb" | "plastic" | "softwood";
@@ -81,7 +86,7 @@ const BALL_METAL = cols(r(12000, 500, 200, 0.2), r(12000, 500, 200, 0.1), null, 
   r(12000, 500, 200, 1), null, r(12000, 500, 200, 1), r(12000, 500, 200, 2));
 const BALL_NONMETAL = cols(null, null, null, null, r(12000, 500, 200, 1), null, r(12000, 500, 200, 1), r(12000, 500, 200, 2));
 
-export const BITS: readonly Bit[] = [
+const TRANSCRIBED: readonly Bit[] = [
   { id: "engr-0.1-60", name: "0.1mm*60° Engraving(Metal)", kind: "engraving", metal: true, diameter: 0.1, angle: 60, rows: VBIT },
   { id: "engr-0.2-30", name: "0.2mm*30° Engraving(Metal)", kind: "engraving", metal: true, diameter: 0.2, angle: 30, rows: VBIT },
   { id: "engr-0.3-30", name: "0.3mm*30° Engraving(Metal)", kind: "engraving", metal: true, diameter: 0.3, angle: 30, rows: VBIT },
@@ -109,6 +114,20 @@ export const BITS: readonly Bit[] = [
       r(12000, 1000, 500, 1), r(12000, 500, 200, 0.1), r(12000, 1000, 500, 1), r(12000, 1200, 500, 2)),
   },
 ];
+
+const FROM_LIBRARY: readonly Bit[] = LIBRARY.filter((b) => b.kind === "flat").flatMap((b): Bit[] => {
+  const { diameter, flute } = nominalSize(b);
+  const known = TRANSCRIBED.some((t) =>
+    t.kind === "flat" && t.diameter === diameter && t.flute === flute && t.metal === b.metal);
+  if (known) return [];
+  const rows = cols(...CAT_MATERIALS.map((m) => {
+    const p = b.presets[m];
+    return p?.feed && p.plunge && p.doc ? r(p.rpm, p.feed, p.plunge, p.doc) : null;
+  }));
+  return [{ id: b.id, name: b.name, kind: "flat", metal: b.metal, diameter, flute, rows }];
+});
+
+export const BITS: readonly Bit[] = [...TRANSCRIBED, ...FROM_LIBRARY];
 
 export const bitById = (id: string) => BITS.find((b) => b.id === id);
 
@@ -197,6 +216,11 @@ export function matchBit(tool: { name: string; diameter?: number; tipDiameter?: 
   if (c.length > 1) {
     const byFlute = c.filter((b) => b.flute !== undefined && near(b.flute, flute, 0.5));
     if (byFlute.length) c = byFlute;
+  }
+  // Makera's names tag the Metal series, so an untagged name that fits both is the other one.
+  if (c.length > 1 && p.metal === undefined) {
+    const plain = c.filter((b) => b.metal === false);
+    if (plain.length) c = plain;
   }
   if (c.length === 1) return { ok: true, bit: c[0]! };
   if (c.length === 0) {
